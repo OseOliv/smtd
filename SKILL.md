@@ -1,6 +1,6 @@
 ---
 name: show-me-the-design
-description: "Build any frontend visual artifact — a full page, screen, section, component, state, or flow — and show it in a local browser for review. Always presents 2-3 distinct options side by side so the user can choose, request another, or mix them. Also analyzes pasted or referenced images as design briefs, visual references, or critique targets. Researches current frontend and accessibility references (WCAG 2.2 AA, WAI-ARIA APG, MDN, framework docs) before designing. Produces isolated runnable HTML/CSS/JS, serves it on localhost with live reload, and iterates from browser feedback. Never modifies app source without approval."
+description: "Build any frontend visual artifact — a full page, screen, section, component, state, or flow — and show it in a local browser for review. Always presents 2-3 distinct options side by side so the user can choose, request another, or mix them. Also analyzes pasted or referenced images as design briefs, visual references, or critique targets. Researches current frontend and accessibility references (WCAG 2.2 AA, WAI-ARIA APG, MDN, framework docs) before designing. Produces isolated runnable HTML/CSS/JS, serves it on localhost with live reload, iterates from browser feedback, and applies the chosen option to the project code when asked. Never modifies app source without approval."
 ---
 
 # Show Me The Design
@@ -23,6 +23,9 @@ judge at a local URL — not a description of a design.
   guessing.
 - **Accessibility is a constraint, not a final pass.** Apply the contract below from
   the first line of markup.
+- **Preview never ships.** Applying a chosen option to the app is an explicit step
+  (section 10). Mockup HTML, preview CSS, and `.preview` state never enter production
+  paths.
 - Build first, explain second. If the brief is clear enough, start.
 - The unit of work is whatever the user needs to see: a page, a section, a component,
   a single state, a set of screens, or a flow. Do not inflate a component request into
@@ -316,6 +319,9 @@ never commit `.preview` or the workspace itself.
 - [ ] Real copy, no placeholders
 - [ ] Gallery URL shared and server stopped
 - [ ] No app source or dependencies modified without approval
+- [ ] When applying: chosen option verified in the real app at 390 / 768 / 1440
+- [ ] When applying: project type-check, lint, and tests pass
+- [ ] When applying: no mockup markup, preview state, or fake data left in production
 
 ## Anti-patterns
 
@@ -335,4 +341,8 @@ never commit `.preview` or the workspace itself.
 - Asking for approval before there is anything to see.
 - Inflating a component request into a full page, or shrinking a page into a component.
 - Generic AI-default aesthetics.
+- Pasting mockup HTML/CSS into the application instead of translating it.
+- Shipping preview scaffolding, fake handlers, or mock data in production.
+- Applying an option without a confirmed choice or target screen.
+- Declaring the integration done from the mockup without checking the real app.
 - Leaving the server running or artifacts inside the product tree.
