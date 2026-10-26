@@ -251,12 +251,57 @@ Server contract:
 
 ## 9. Handoff
 
-- Stop the server: `scripts/stop-preview.sh <design-dir>`.
+- Stop the server: `scripts/stop-preview.sh <design-dir>`, unless the user is still
+  comparing options.
 - Summarize artifacts, options, states, references, and files.
-- If asked to integrate: implement the chosen option in the project using its
-  conventions, migrate tokens and copy from the approved design, and remove
-  preview-only scaffolding. Do not commit or refactor beyond the approved scope.
+- Confirm the chosen option and record it in `DECISIONS.md`.
 - Keep approved designs. Delete throwaway workspaces only with consent.
+- If the user wants to apply the chosen option, continue to section 10.
+
+## 10. Apply the chosen option to the project
+
+Trigger: the user says "apply", "implement", "levar para o código", "usar a opção B",
+or similar. This is the only step allowed to modify application source. If no option is
+recorded in `DECISIONS.md`, ask which one. If the target screen or route is ambiguous,
+ask one question.
+
+Before editing:
+
+- Locate the design workspace from the handoff. If the path is unknown, ask; do not
+  reconstruct the design from memory.
+- Re-read the chosen artifact, `DECISIONS.md`, and `REFERENCES.md`.
+- Read the target route/page, its components, theme tokens, i18n, and data layer.
+- Build a short mapping: each mockup region → existing or new component; each color,
+  type, and spacing value → existing token or a proposed token.
+- Reuse first. Add a token or component only when nothing existing fits, and say why.
+
+Implementation:
+
+- Translate the mockup into the project's architecture. Never paste mockup HTML or CSS
+  into the app.
+- Follow the project's rules. For this repository's Vue stack: Vue 3 Composition API,
+  TypeScript strict, PrimeVue, the four-file component split, BEM/component-prefixed
+  classes, the `@/` alias, and Vitest.
+- Wire real state, data, routing, and i18n. Do not leave lorem ipsum, fake handlers, or
+  mock arrays in production code.
+- If the design needs data or behavior the project does not have, stop and ask. Do not
+  invent endpoints, permissions, or business rules.
+- Preserve the accessibility contract: semantics, names, focus order, keyboard
+  behavior, contrast, targets, and reduced motion.
+- Keep the change scoped. Do not refactor unrelated files or add features the chosen
+  option did not contain.
+
+Verification:
+
+- Run the project's type-check, lint, and tests; fix regressions.
+- Run the real app and compare against the chosen mockup at 390 / 768 / 1440.
+- Do a keyboard-only pass and a contrast/target check on the real UI.
+- Remove preview-only scaffolding, temporary routes, and unused assets.
+- Report: files changed, tokens/components added, deviations from the mockup, and the
+  verification evidence.
+
+Do not commit or open a PR unless asked. Keep the design workspace as the reference;
+never commit `.preview` or the workspace itself.
 
 ## Definition of done
 
