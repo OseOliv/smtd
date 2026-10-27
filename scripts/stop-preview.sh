@@ -30,19 +30,32 @@ fi
 
 pid="$(cat "$PID_FILE" 2>/dev/null || true)"
 
-if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+is_alive() {
+  local target_pid="$1"
+  if [[ -z "$target_pid" ]] || ! kill -0 "$target_pid" 2>/dev/null; then
+    return 1
+  fi
+  if [[ -r "/proc/$target_pid/status" ]]; then
+    if grep -q '^State:[[:space:]]*Z' "/proc/$target_pid/status" 2>/dev/null; then
+      return 1
+    fi
+  fi
+  return 0
+}
+
+if is_alive "$pid"; then
   kill "$pid" 2>/dev/null || true
   for _ in $(seq 1 20); do
-    if ! kill -0 "$pid" 2>/dev/null; then
+    if ! is_alive "$pid"; then
       break
     fi
     sleep 0.1
   done
-  if kill -0 "$pid" 2>/dev/null; then
+  if is_alive "$pid"; then
     kill -9 "$pid" 2>/dev/null || true
     sleep 0.1
   fi
-  if kill -0 "$pid" 2>/dev/null; then
+  if is_alive "$pid"; then
     printf '{"status":"failed","error":"process still running"}\n'
     exit 1
   fi

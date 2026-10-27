@@ -80,10 +80,23 @@ PREVIEW_FILE="$STATE_DIR/preview.json"
 LOG_FILE="$STATE_DIR/server.log"
 mkdir -p "$STATE_DIR"
 
+is_alive() {
+  local target_pid="$1"
+  if [[ -z "$target_pid" ]] || ! kill -0 "$target_pid" 2>/dev/null; then
+    return 1
+  fi
+  if [[ -r "/proc/$target_pid/status" ]]; then
+    if grep -q '^State:[[:space:]]*Z' "/proc/$target_pid/status" 2>/dev/null; then
+      return 1
+    fi
+  fi
+  return 0
+}
+
 # Reuse a healthy server that is already serving this workspace.
 if [[ -f "$PID_FILE" ]]; then
   existing_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
-  if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+  if is_alive "$existing_pid"; then
     if [[ -f "$PREVIEW_FILE" ]]; then
       cat "$PREVIEW_FILE"
       exit 0

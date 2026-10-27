@@ -1,6 +1,6 @@
 ---
 name: show-me-the-design
-description: "Build any frontend visual artifact — a full page, screen, section, component, state, or flow — and show it in a local browser for review. Always presents 2-3 distinct options side by side so the user can choose, request another, or mix them. Also analyzes pasted or referenced images as design briefs, visual references, or critique targets. Researches current frontend and accessibility references (WCAG 2.2 AA, WAI-ARIA APG, MDN, framework docs) before designing. Produces isolated runnable HTML/CSS/JS, serves it on localhost with live reload, iterates from browser feedback, and applies the chosen option to the project code when asked. Never modifies app source without approval."
+description: "Use when building, redesigning, or reviewing any frontend visual artifact (page, section, component, state, or flow), comparing 2-3 live on-brand options in a local browser, or critiquing pasted/referenced UI images. Extracts product design tokens first, checks primary sources (WCAG 2.2 AA, WAI-ARIA APG, MDN, Baseline, pinned framework docs), serves runnable HTML/CSS/JS with live reload, and applies the chosen option only on approval."
 ---
 
 # Show Me The Design
@@ -15,9 +15,25 @@ judge at a local URL — not a description of a design.
   user chooses. A single artifact is allowed only when the user explicitly asks for
   one, or after a direction is chosen and the work is refinement.
 - Options are alternatives, not cosmetic variants. They must differ in thesis:
-  layout, type, density, tone, or signature — not only accent color.
-- **Current references first.** Research the platform, framework, and accessibility
-  guidance before designing. Use primary sources, note versions, and record them.
+  layout, hierarchy, density, interaction signature, or tone — not only accent color.
+- **Start from the product's design system.** Extract real tokens (color, typography,
+  radius, shadow, spacing, motion, iconography) and existing components before
+  proposing. Default to `faithful` mode; use `exploration` mode only when the user
+  explicitly asks for a redesign or new visual direction. Every option must state its
+  fidelity mode.
+- **Make options feel alive.** Every option requires at least one purposeful
+  interaction or motion moment (hover, reveal, transition, or state feedback) with
+  `@media (prefers-reduced-motion: reduce)` handling, complete interactive states, and
+  real domain content — never a polished wireframe or static box.
+- **Be direct — strict question and research budget.** Ask at most one clarification
+  round (and only when the brief and codebase do not already answer a blocking
+  question). Research only what changes the design decision. Ship the first visible
+  preview fast, and reply with the preview URL, one line on what to look at, and an
+  explicit choice question.
+- **Current primary sources.** Verify only the constraints that affect the decision
+  against primary sources (WCAG 2.2 AA, WAI-ARIA APG, MDN, Baseline, and the project's
+  pinned framework docs). Record document title, URL, version, and publication/check
+  date in `REFERENCES.md`. Never present draft specs as requirements.
 - **Images are evidence.** When an image is pasted or referenced, analyze it before
   asking questions. If the active model cannot read images, say so instead of
   guessing.
@@ -26,7 +42,6 @@ judge at a local URL — not a description of a design.
 - **Preview never ships.** Applying a chosen option to the app is an explicit step
   (section 10). Mockup HTML, preview CSS, and `.preview` state never enter production
   paths.
-- Build first, explain second. If the brief is clear enough, start.
 - The unit of work is whatever the user needs to see: a page, a section, a component,
   a single state, a set of screens, or a flow. Do not inflate a component request into
   a page, and do not shrink a page request into a component.
@@ -36,7 +51,21 @@ judge at a local URL — not a description of a design.
 - Isolate preview artifacts in a design workspace. Default:
   `~/.omp/designs/<timestamp>-<slug>/`. If the user wants them inside the project,
   get approval and keep the workspace gitignored.
-- Never end a design turn without the preview URL and a one-line "what to look at".
+- Never end a design turn without the preview URL, one line on what to look at, and an
+  explicit choice question.
+
+## Trigger validation matrix
+
+Use this matrix to validate when `show-me-the-design` should and should not trigger:
+
+| Prompt | Trigger? | Why |
+|---|---|---|
+| "Design a new billing settings page for our app and show me a few options." | Yes | Requests a frontend page with side-by-side options in a browser preview. |
+| "Our empty state for the alerts table feels dead. Give me 3 on-brand alternatives." | Yes | Targets a component/state and asks for live, on-brand visual options. |
+| "Critique this screenshot `@checkout.png` and show me fixed versions." | Yes | Image critique plus visual artifact generation and comparison. |
+| "Redesign our marketing hero section — explore a bolder editorial direction." | Yes | Explicit redesign request; triggers in `exploration` fidelity mode. |
+| "Fix the off-by-one pagination bug in `useInvoices.ts`." | No | Logic/data bug with no visual design or UI comparison request. |
+| "Add a `created_at` index to the PostgreSQL `orders` migration." | No | Backend database task; no frontend visual artifact involved. |
 
 ## Scale
 
@@ -46,7 +75,7 @@ Every row below is repeated per option: 2–3 distinct directions by default.
 |---|---|
 | Full page / screen | Complete page composition: header, nav, main, footer, real content |
 | Section / block | The section inside a minimal page context, so spacing and hierarchy read correctly |
-| Component | A specimen page: variants, sizes, and states on one canvas |
+| Component | A specimen page: variants, sizes, and interactive states on one canvas |
 | Single state | The artifact in that state, plus the default beside it when comparison helps |
 | Flow | The screens linked in order, or side by side, with the transitions made explicit |
 
@@ -61,22 +90,51 @@ Identify:
 - Brand/system constraints: colors, fonts, spacing, tone, existing patterns.
 - Required artifacts, states, and breakpoints.
 
-If the brief is missing essentials, ask at most three questions, one at a time.
-Do not interview when the brief already answers them.
+### Question budget
 
-Inspect the project read-only: `package.json`, theme/tokens, existing components,
-fonts, assets, routing, i18n. Detect framework, UI library, and their versions.
+- **Zero questions by default** when the brief and codebase already provide enough
+  context to build the first preview.
+- **At most one clarification round** (1–2 direct questions in a single message) only
+  when a blocking ambiguity cannot be answered from the repo or provided images. Never
+  run a multi-turn interview before showing a preview.
+
+### Visual-identity contract & fidelity modes
+
+Inspect the project read-only before proposing options: `package.json`, CSS variables,
+Tailwind/theme config, token files, existing components, typography, icon sets,
+routing, and i18n. Detect the framework, UI library, and their pinned versions.
+
+Extract the product's visual language into `<workspace>/tokens.json` and shared
+`<workspace>/tokens.css`:
+
+- **Color:** surfaces, ink/text hierarchy, borders, brand accents, semantic status
+  tokens (`success`, `warning`, `danger`, `info`).
+- **Typography:** font families (display, sans, mono), size scale, weights, line
+  heights, letter-spacing, and numeric formatting (`tabular-nums`).
+- **Radius & border:** corner radii (`sm`, `md`, `lg`, `pill`), border widths, hairline
+  divider conventions.
+- **Shadow & elevation:** card, popover, modal, and sticky-header elevation tokens.
+- **Spacing & grid:** base spacing unit, container widths, column gaps, and section
+  rhythm.
+- **Motion:** duration tokens, easing curves, and transition conventions.
+- **Iconography & existing components:** icon stroke/fill style, button/input/badge/table
+  idioms that already exist in the product.
+
+Every option must declare one of two fidelity modes:
+
+- **`faithful` (default):** Strictly honors the product's extracted tokens, font stack,
+  radii, shadows, and component idioms. Options explore distinct layout, hierarchy,
+  density, and workflow trade-offs while looking unmistakably native to the product.
+- **`exploration` (only when requested):** Used only when the user explicitly asks for
+  a redesign, rebrand, or new visual direction. May propose new palette, typography, or
+  surface tokens, and must explicitly document which product tokens it departs from and
+  why.
 
 Choose output mode:
 
 - **Standalone preview (default).** Plain HTML/CSS/JS, no build step, no app changes.
 - **Project-native (only if asked).** Vue 3 Composition API, the project's UI library,
   and its component-file conventions.
-
-Choose fidelity:
-
-- **Wireframe** for layout exploration only.
-- **High fidelity** for everything else. Default to high fidelity.
 
 If the user supplied images, treat them as part of the brief and analyze them next.
 
@@ -116,8 +174,10 @@ preview server or build artifacts.
 
 ## 3. Gather current references
 
-Research before designing. Prefer primary sources over blog posts and undated
-snippets. Match the project's pinned versions, not the latest release.
+Research only what changes the design decision. Do not spend multiple turns browsing
+generic articles before building. Prefer primary sources over blog posts and undated
+snippets, and match the project's pinned versions rather than unverified latest
+releases.
 
 | Need | Primary source |
 |---|---|
@@ -125,39 +185,50 @@ snippets. Match the project's pinned versions, not the latest release.
 | Widget behavior and keyboard patterns | WAI-ARIA Authoring Practices Guide (APG) |
 | HTML, CSS, JS platform behavior | MDN Web Docs |
 | Browser and feature support | Baseline / caniuse |
-| Framework and UI library | Official docs for the detected version |
+| Framework and UI library | Official docs for the project's pinned version |
 | Design system | Project tokens, components, and style guide |
 
 Rules:
 
-- Check the document's version and date. Do not present drafts as requirements.
-- Extract only the constraints that change this design. Do not paste whole pages.
-- If web access is unavailable, use installed/project docs and say so explicitly.
-- Record every source in `REFERENCES.md`: URL, title, version/date, and what it
-  informed. The gallery can link to it.
+- **Record date and version.** Every entry in `REFERENCES.md` must include:
+  - Document title and canonical URL
+  - Specification or package version (for example `WCAG 2.2 Recommendation`, `Vue 3.4`,
+    `Baseline Widely Available`)
+  - Publication or verification date (`YYYY-MM-DD`)
+  - The specific constraint it informed in the options
+- **Never present drafts as requirements.** Editor's drafts, working drafts, or stage-2
+  proposals must never be enforced as normative requirements.
+- Extract only the rules that affect the artifact being built. Do not paste whole pages.
+- If web access is unavailable, use installed/project docs, record the local package
+  version and check date, and state that offline sources were used.
 
 ## 4. Design plan — 5 to 10 lines per option, before code
 
-For each option, define:
+Keep planning tight so the first preview ships fast. For each option (`A`, `B`, `C`),
+define:
 
-- Name and one-sentence thesis.
-- Subject, audience, and the job of the artifact.
-- Palette: 4–6 named hex values.
-- Type: display, body, and utility roles. Prefer project or system fonts.
-- Layout: one-sentence concept plus an ASCII wireframe.
-- Signature: the one element this option will be remembered by.
-- One justified risk.
+- **Label & name:** e.g. `A — Compact Ledger`
+- **One-sentence thesis:** how this option solves the user's job differently.
+- **Fidelity mode:** `faithful` (default, locked to extracted product tokens) or
+  `exploration` (explicitly requested redesign).
+- **Palette:** 4–6 named hex values drawn from `tokens.json` (or proposed tokens in
+  `exploration` mode).
+- **Type:** display, body, and utility/mono roles using project or system fonts.
+- **Interaction & motion signature:** the purposeful interaction, transition, or state
+  feedback that makes this option feel alive (plus its `prefers-reduced-motion`
+  behavior).
+- **Trade-offs & what to look at:** what this option optimizes for, what it gives up,
+  and the specific detail the user should inspect.
 
 Check the set: if two options would be described the same way in a sentence, they are
-one option. Replace one. Reject generic defaults unless the brief explicitly asks for
-them:
+one option. Replace one. Reject generic AI defaults unless the product's own system or
+the brief explicitly calls for them:
 
 - warm cream background + serif display + terracotta accent;
-- near-black background + single acid accent;
-- broadsheet hairlines, dense columns, zero radius.
+- near-black background + single acid neon accent;
+- broadsheet hairlines, dense columns, zero radius when the product uses rounded cards.
 
-Ground choices in the subject's own world: its materials, instruments, artifacts, and
-vernacular. If the brief pins a direction, the brief wins.
+Ground every choice in the product's own design system and domain vocabulary.
 
 ## 5. Accessibility contract
 
@@ -191,21 +262,76 @@ behavior.
 
 - One HTML document per artifact per option. Organize as
   `<artifact>/option-a.html`, `option-b.html`, `option-c.html`.
-- Shared `tokens.css` and `components.css` per workspace, with per-option overrides.
-- Full page: compose the whole surface with real content, no lorem ipsum.
-- Section: show it inside a minimal page so its spacing and hierarchy are honest.
-- Component: build a specimen page with variants, sizes, and interaction states.
-- States: default, hover, focus, loading, empty, error, success, and disabled where
-  they apply. Show them side by side when the comparison matters.
-- Flow: link the screens in order or lay them side by side. Do not fake interaction
-  that the artifact cannot actually perform.
-- Responsive at 390 / 768 / 1440. Mobile-first.
-- Motion: at most one orchestrated moment. No ambient noise.
-- CSS: flat specificity, no clashing `.section` versus element selectors, tokens over
-  magic values.
-- Assets: local/project assets or CSS/SVG. Say so before using an external CDN.
+- Shared `tokens.json`, `tokens.css`, and `components.css` per workspace, with
+  per-option overrides.
+- **Make options feel alive:**
+  - Include at least one purposeful interaction or motion moment per option (for
+    example: interactive state switcher, expandable detail drawer, live filter/sort,
+    inline validation feedback, or choreographed elevation/reveal transition).
+  - Always include an explicit `@media (prefers-reduced-motion: reduce)` rule that
+    disables non-essential motion while preserving instant state feedback.
+- **Complete states, not wireframes:**
+  - Implement default, `:hover`, `:focus-visible`, `:active`, loading, empty, error,
+    success, and `:disabled` states where they apply.
+  - Provide an in-artifact state bar or interactive controls when helpful so the user
+    can toggle loading/empty/error states directly in the preview.
+- **Real domain content:**
+  - Full page: compose the whole surface with realistic domain copy, plausible metrics,
+    and authentic identifiers — never `lorem ipsum`, `Foo/Bar`, or grey placeholder
+    blocks.
+  - Section: show it inside a minimal product page frame so spacing and hierarchy read
+    honestly.
+  - Component: build an interactive specimen page with variants, sizes, and states.
+  - Flow: link the screens in order or lay them side by side with working step
+    transitions.
+- Responsive at `390` / `768` / `1440`. Mobile-first.
+- CSS: flat specificity, no clashing `.section` versus element selectors, product
+  tokens over magic values.
+- Assets: local/project assets or crisp inline SVG matching the product's icon style.
+  Say so before using an external CDN.
 - Copy: active voice, sentence case, specific, consistent verbs. Name things by what
   people control, not by how the system is built.
+
+### Componentized comparison metadata (`options.json` & `<meta name="smtd-*">`)
+
+So the preview gallery can render isolated, side-by-side comparison cards with full
+context, supply metadata for every option via `<artifact>/options.json` (or workspace
+`options.json`) **and** matching `<meta name="smtd-*">` tags in each option's `<head>`:
+
+1. **`<artifact>/options.json`** (array or `{ "options": [...] }` keyed by file or
+   label):
+
+   ```json
+   {
+     "options": [
+       {
+         "file": "option-a.html",
+         "label": "A",
+         "title": "Compact Ledger",
+         "thesis": "High-density split view that keeps invoice line items and approval actions above the fold.",
+         "fidelity": "faithful",
+         "palette": ["#0F172A", "#F8FAFC", "#2563EB", "#16A34A", "#E2E8F0"],
+         "type": "Inter (display/body) · JetBrains Mono (amounts)",
+         "tradeoffs": "Fits 2x more rows on 1440px, but truncates long vendor notes to a drawer.",
+         "lookAt": "Try the inline status filter and keyboard row selection."
+       }
+     ]
+   }
+   ```
+
+2. **HTML `<meta name="smtd-*">` fallback tags** inside each `option-*.html` so
+   standalone files carry their own card metadata:
+
+   ```html
+   <meta name="smtd-label" content="A">
+   <meta name="smtd-title" content="Compact Ledger">
+   <meta name="smtd-thesis" content="High-density split view that keeps invoice line items and approval actions above the fold.">
+   <meta name="smtd-fidelity" content="faithful">
+   <meta name="smtd-palette" content="#0F172A, #F8FAFC, #2563EB, #16A34A, #E2E8F0">
+   <meta name="smtd-type" content="Inter (display/body) · JetBrains Mono (amounts)">
+   <meta name="smtd-tradeoffs" content="Fits 2x more rows on 1440px, but truncates long vendor notes to a drawer.">
+   <meta name="smtd-look-at" content="Try the inline status filter and keyboard row selection.">
+   ```
 
 ## 7. Serve it
 
@@ -219,11 +345,14 @@ Prints JSON:
 {"url":"http://localhost:PORT/","gallery":"http://localhost:PORT/","state":"/abs/path/.preview"}
 ```
 
-- Open the URL. If browser tooling is available (for example omp `browser.open`),
-  verify rendering and console errors, check accessibility, and capture desktop and
-  mobile screenshots before reporting.
-- The gallery groups options by artifact and renders them side by side at the same
-  viewport, so differences are visible at a glance.
+- Open the URL immediately once the initial options are written. If browser tooling is
+  available (for example omp `browser.open`), verify rendering and console errors,
+  check accessibility, and capture desktop and mobile screenshots before reporting.
+- The gallery renders one isolated comparison card per option (`A`, `B`, `C`) side by
+  side at the same synchronized viewport (`390`, `768`, or `1440`), showing each
+  option's badge, title, fidelity mode (`faithful` / `exploration`), thesis, color
+  palette swatches, typography summary, trade-offs, "what to look at" callout, interactive
+  iframe toggle, and full-screen link.
 - Direct file URLs serve one artifact full-screen.
 - Live reload on file changes.
 - Binds `127.0.0.1` by default, picks a free port, and exits after 30 minutes idle.
@@ -235,11 +364,15 @@ Server contract:
 - Path traversal is rejected; no directory outside the design workspace is served.
 - Zero runtime dependencies.
 
-## 8. Review loop
+## 8. Review loop (fast, direct replies)
 
-- Every turn: URL, one line on what to look at, and which options are new or changed.
-- Ask the choice explicitly: "Which option should I refine — or do you want another
-  direction?"
+- **Ship the first visible version fast.** Do not write multi-paragraph essays before
+  or after starting the preview server; the comparison cards in the gallery already
+  display the thesis, palette, type, and trade-offs.
+- **Every design turn reply must be concise and contain three things:**
+  1. **The preview URL** (and which options are new or updated).
+  2. **One line on what to look at** (the key interaction or trade-off to test).
+  3. **An explicit choice question:** e.g. `"Which option should I refine (A, B, or C) — or do you want a new direction or a mix?"`
 - Merge browser feedback (clicks/screenshots) with terminal feedback. Treat browser
   screenshots as image input: inspect them and record findings; use DOM/ARIA when the
   screenshot alone cannot prove a behavior.
@@ -272,7 +405,7 @@ Before editing:
 
 - Locate the design workspace from the handoff. If the path is unknown, ask; do not
   reconstruct the design from memory.
-- Re-read the chosen artifact, `DECISIONS.md`, and `REFERENCES.md`.
+- Re-read the chosen artifact, `tokens.json`, `DECISIONS.md`, and `REFERENCES.md`.
 - Read the target route/page, its components, theme tokens, i18n, and data layer.
 - Build a short mapping: each mockup region → existing or new component; each color,
   type, and spacing value → existing token or a proposed token.
@@ -308,16 +441,19 @@ never commit `.preview` or the workspace itself.
 
 ## Definition of done
 
-- [ ] 2–3 distinct options presented side by side for each new request
+- [ ] Product design tokens and existing components extracted first (`tokens.json` / `tokens.css`)
+- [ ] Every option declares its fidelity mode (`faithful` by default, `exploration` only when requested)
+- [ ] 2–3 distinct options presented side by side in isolated A/B/C comparison cards
 - [ ] Options differ in thesis, not only in color or spacing
-- [ ] Current references gathered from primary sources and recorded in `REFERENCES.md`
+- [ ] Every option includes purposeful interaction/motion (`prefers-reduced-motion` compliant), complete states, and real domain content
+- [ ] Card metadata provided via `options.json` and/or `<meta name="smtd-*">` tags (title, thesis, fidelity, palette, type, trade-offs, what to look at)
+- [ ] At most one clarification round when needed; fast first preview delivered with `URL + one line + explicit choice`
+- [ ] Current references gathered from primary sources with version and date recorded in `REFERENCES.md` (no draft specs treated as requirements)
 - [ ] Provided images analyzed and recorded in `IMAGE-NOTES.md`
 - [ ] Image-only analysis requests delivered notes without starting a server
 - [ ] WCAG 2.2 AA verified: keyboard, focus, names, contrast, 24×24 targets, reflow
-- [ ] Every requested artifact exists at 390 / 768 / 1440
-- [ ] Variants and relevant states covered
-- [ ] Real copy, no placeholders
-- [ ] Gallery URL shared and server stopped
+- [ ] Every requested artifact works at 390 / 768 / 1440
+- [ ] Gallery URL shared and server stopped on handoff
 - [ ] No app source or dependencies modified without approval
 - [ ] When applying: chosen option verified in the real app at 390 / 768 / 1440
 - [ ] When applying: project type-check, lint, and tests pass
@@ -325,22 +461,28 @@ never commit `.preview` or the workspace itself.
 
 ## Anti-patterns
 
+- Ignoring the product's design system and inventing generic off-brand styles in `faithful` mode.
+- Switching to `exploration` mode when the user did not ask for a redesign.
+- Delivering static, lifeless mockups with no hover, focus, transition, or state feedback.
+- Omitting `@media (prefers-reduced-motion: reduce)` when adding motion.
+- Omitting option metadata (`options.json` or `<meta name="smtd-*">`) so comparison cards lack thesis, palette, type, trade-offs, or focus points.
+- Running multi-turn interviews or lengthy research monologues before showing a first preview.
 - Claiming to have seen an image the active model cannot read.
 - Guessing cropped, blurred, or hidden details instead of stating limits.
 - Treating sampled screenshot colors as exact design tokens.
 - Ignoring a provided image and designing from scratch.
-- Using stale or undated blog snippets instead of primary docs.
-- Citing draft specs as requirements.
+- Using stale or undated blog snippets instead of primary docs with recorded version and date.
+- Citing draft specs as normative requirements.
 - Adding ARIA where native HTML already works.
 - Treating accessibility as a post-build checklist.
 - Delivering one design when options were expected.
 - Selling cosmetic variants as distinct options.
 - Replacing existing options when the user asks for another.
 - Describing a design instead of building it.
-- Presenting wireframe boxes as final UI.
+- Presenting wireframe boxes or `lorem ipsum` as final UI.
 - Asking for approval before there is anything to see.
 - Inflating a component request into a full page, or shrinking a page into a component.
-- Generic AI-default aesthetics.
+- Generic AI-default aesthetics (warm cream + terracotta serif, acid-on-black, random brutalist hairlines).
 - Pasting mockup HTML/CSS into the application instead of translating it.
 - Shipping preview scaffolding, fake handlers, or mock data in production.
 - Applying an option without a confirmed choice or target screen.

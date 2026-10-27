@@ -3,7 +3,7 @@
  * show-me-the-design — zero-dependency preview server.
  *
  * Serves a design workspace at http://localhost:<port>/ with:
- *   GET /            gallery grouping options by artifact
+ *   GET /            gallery grouping options by artifact into isolated A/B/C comparison cards
  *   GET /<path>      static file (HTML gets live-reload injected)
  *   GET /__reload    server-sent events used for live reload
  *
@@ -120,6 +120,15 @@ function escapeHtml(value) {
   }[character]));
 }
 
+function decodeHtmlEntities(value) {
+  return String(value)
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
 function encodeRelPath(relativePath) {
   return relativePath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
 }
@@ -160,23 +169,271 @@ function collectHtmlFiles() {
   return files.sort();
 }
 
-function renderGroup(group, entries) {
-  const title = group === '' ? 'Root' : group;
-  const cards = entries.map((relativePath) => {
-    const href = '/' + encodeRelPath(relativePath);
-    const name = path.posix.basename(relativePath);
-    return `<article class="card">
+function deriveOptionLabel(filename, index) {
+  const stem = filename.replace(/\.html?$/i, '');
+  const match = stem.match(/(?:^|[-_\s])option[-_\s]*([a-z0-9])$/i) || stem.match(/^([a-z])$/i);
+  if (match) return match[1].toUpperCase();
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  return alphabet[index] ?? String(index + 1);
+}
+
+function normalizePalette(raw) {
+  if (!raw) return [];
+  const items = Array.isArray(raw)
+    ? raw
+    : String(raw).split(/[,;|]+/);
+  const result = [];
+  for (const item of items) {
+    if (!item) continue;
+    if (typeof item === 'object') {
+      const hex = String(item.hex ?? item.color ?? item.value ?? '').trim();
+      const name = String(item.name ?? item.role ?? item.label ?? '').trim();
+      if (hex) result.push({ color: hex, label: name ? `${name} (${hex})` : hex });
+      continue;
+    }
+    const text = String(item).trim();
+    if (!text) continue;
+    const hexMatch = text.match(/(#[0-9a-fA-F]{3,8}|(?:rgb|hsl|oklch)a?\([^)]+\))/);
+    if (hexMatch) {
+      const color = hexMatch[1];
+      const prefix = text.slice(0, hexMatch.index).replace(/[:\-–—()\s]+$/g, '').trim();
+      result.push({ color, label: prefix ? `${prefix} (${color})` : color });
+    } else {
+      result.push({ color: text, label: text });
+    }
+  }
+  return result;
+}
+
+function normalizeFidelity(raw) {
+  const text = String(raw ?? '').trim().toLowerCase();
+  if (!text) return '';
+  if (text.includes('explor')) return 'exploration';
+  if (text.includes('faith') || text.includes('product') || text.includes('system')) return 'faithful';
+  return String(raw).trim();
+}
+
+function parseHtmlMeta(fullPath) {
+  let content = '';
+  try {
+    content = fs.readFileSync(fullPath, 'utf8');
+  } catch {
+    return {};
+  }
+  const headSlice = content.slice(0, 16384);
+  const meta = {};
+  const titleMatch = headSlice.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (titleMatch) {
+    meta.htmlTitle = decodeHtmlEntities(titleMatch[1].replace(/\s+/g, ' ').trim());
+  }
+  const metaTagRegex = /<meta\b[^>]*>/gi;
+  const attrRegex = /([a-zA-Z0-9_:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
+  let tagMatch;
+  while ((tagMatch = metaTagRegex.exec(headSlice)) !== null) {
+    const attrs = {};
+    let attrMatch;
+    while ((attrMatch = attrRegex.exec(tagMatch[0])) !== null) {
+      const key = attrMatch[1].toLowerCase();
+      const val = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? '';
+      attrs[key] = decodeHtmlEntities(val.trim());
+    }
+    const name = (attrs.name ?? attrs.property ?? '').toLowerCase();
+    if (name.startsWith('smtd-') && attrs.content !== undefined) {
+      meta[name.slice('smtd-'.length)] = attrs.content;
+    }
+  }
+  return meta;
+}
+
+function readJsonFile(fullPath) {
+  try {
+    if (!fs.existsSync(fullPath)) return null;
+    return JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function lookupOptionInJson(jsonData, relativePath, filename, label) {
+  if (!jsonData || typeof jsonData !== 'object') return null;
+
+  if (jsonData.groups && typeof jsonData.groups === 'object') {
+    const groupDir = path.posix.dirname(relativePath);
+    const groupKey = groupDir === '.' ? '' : groupDir;
+    const groupEntry = jsonData.groups[groupKey] ?? jsonData.groups[groupDir];
+    if (groupEntry) {
+      const found = lookupOptionInJson(groupEntry, relativePath, filename, label);
+      if (found) return found;
+    }
+  }
+
+  const list = Array.isArray(jsonData)
+    ? jsonData
+    : Array.isArray(jsonData.options)
+      ? jsonData.options
+      : null;
+
+  if (list) {
+    const stem = filename.replace(/\.html?$/i, '');
+    for (const item of list) {
+      if (!item || typeof item !== 'object') continue;
+      const itemFile = String(item.file ?? item.path ?? item.href ?? '').replace(/^\.\//, '');
+      const itemLabel = String(item.label ?? item.id ?? item.option ?? '').toUpperCase();
+      if (
+        itemFile === relativePath ||
+        itemFile === filename ||
+        itemFile.replace(/\.html?$/i, '') === stem ||
+        (itemLabel && itemLabel === label)
+      ) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  const stem = filename.replace(/\.html?$/i, '');
+  const candidates = [relativePath, filename, stem, label, label.toLowerCase()];
+  for (const key of candidates) {
+    if (key && jsonData[key] && typeof jsonData[key] === 'object' && !Array.isArray(jsonData[key])) {
+      return jsonData[key];
+    }
+  }
+  return null;
+}
+
+function resolveOptionMetadata(group, relativePath, index, groupJson, rootJson) {
+  const filename = path.posix.basename(relativePath);
+  const defaultLabel = deriveOptionLabel(filename, index);
+  const fullPath = path.join(DESIGN_DIR, relativePath);
+
+  const htmlMeta = parseHtmlMeta(fullPath);
+  const fromGroup = lookupOptionInJson(groupJson, relativePath, filename, defaultLabel);
+  const fromRoot = lookupOptionInJson(rootJson, relativePath, filename, defaultLabel);
+  const jsonMeta = { ...(fromRoot ?? {}), ...(fromGroup ?? {}) };
+
+  const label = String(
+    jsonMeta.label ?? jsonMeta.option ?? htmlMeta.label ?? defaultLabel
+  ).trim().toUpperCase() || defaultLabel;
+
+  const title = String(
+    jsonMeta.title ?? jsonMeta.name ?? htmlMeta.title ?? htmlMeta.name ?? htmlMeta.htmlTitle ?? filename.replace(/\.html?$/i, '')
+  ).trim();
+
+  const thesis = String(
+    jsonMeta.thesis ?? jsonMeta.summary ?? jsonMeta.description ?? htmlMeta.thesis ?? htmlMeta.summary ?? ''
+  ).trim();
+
+  const fidelity = normalizeFidelity(
+    jsonMeta.fidelity ?? jsonMeta.mode ?? htmlMeta.fidelity ?? htmlMeta.mode ?? ''
+  );
+
+  const palette = normalizePalette(
+    jsonMeta.palette ?? jsonMeta.colors ?? htmlMeta.palette ?? htmlMeta.colors ?? ''
+  );
+
+  const typography = String(
+    jsonMeta.type ?? jsonMeta.typography ?? jsonMeta.fonts ?? htmlMeta.type ?? htmlMeta.typography ?? ''
+  ).trim();
+
+  const tradeoffsRaw = jsonMeta.tradeoffs ?? jsonMeta['trade-offs'] ?? jsonMeta.tradeOffs ?? htmlMeta.tradeoffs ?? htmlMeta['trade-offs'] ?? '';
+  const tradeoffs = Array.isArray(tradeoffsRaw)
+    ? tradeoffsRaw.map((item) => String(item).trim()).filter(Boolean).join(' · ')
+    : String(tradeoffsRaw).trim();
+
+  const lookAtRaw = jsonMeta.lookAt ?? jsonMeta['look-at'] ?? jsonMeta.focus ?? jsonMeta.whatToLookAt ?? htmlMeta['look-at'] ?? htmlMeta.lookat ?? htmlMeta.focus ?? '';
+  const lookAt = Array.isArray(lookAtRaw)
+    ? lookAtRaw.map((item) => String(item).trim()).filter(Boolean).join(' · ')
+    : String(lookAtRaw).trim();
+
+  return {
+    label,
+    title,
+    filename,
+    relativePath,
+    thesis,
+    fidelity,
+    palette,
+    typography,
+    tradeoffs,
+    lookAt
+  };
+}
+
+function renderCard(meta, index) {
+  const href = '/' + encodeRelPath(meta.relativePath);
+  const cardId = `card-${meta.relativePath.replace(/[^a-zA-Z0-9_-]/g, '-')}-${index}`;
+
+  const fidelityBadge = meta.fidelity
+    ? `<span class="fidelity fidelity-${escapeHtml(meta.fidelity)}" title="Design system fidelity mode">${escapeHtml(meta.fidelity)}</span>`
+    : '';
+
+  const thesisBlock = meta.thesis
+    ? `<p class="thesis">${escapeHtml(meta.thesis)}</p>`
+    : '';
+
+  const swatchesHtml = meta.palette.length > 0
+    ? `<div class="swatches" role="list" aria-label="Option ${escapeHtml(meta.label)} color palette">
+        ${meta.palette.map((swatch) => `<span class="swatch-chip" role="listitem" title="${escapeHtml(swatch.label)}">
+          <span class="swatch-dot" style="background:${escapeHtml(swatch.color)}" aria-hidden="true"></span>
+          <code>${escapeHtml(swatch.color)}</code>
+        </span>`).join('')}
+      </div>`
+    : '';
+
+  const detailsRows = [];
+  if (meta.palette.length > 0) {
+    detailsRows.push(`<div class="spec-row"><dt>Palette</dt><dd>${swatchesHtml}</dd></div>`);
+  }
+  if (meta.typography) {
+    detailsRows.push(`<div class="spec-row"><dt>Type</dt><dd>${escapeHtml(meta.typography)}</dd></div>`);
+  }
+  if (meta.tradeoffs) {
+    detailsRows.push(`<div class="spec-row"><dt>Trade-offs</dt><dd>${escapeHtml(meta.tradeoffs)}</dd></div>`);
+  }
+  if (meta.lookAt) {
+    detailsRows.push(`<div class="spec-row spec-look"><dt>What to look at</dt><dd>${escapeHtml(meta.lookAt)}</dd></div>`);
+  }
+
+  const specsBlock = detailsRows.length > 0
+    ? `<dl class="card-specs">${detailsRows.join('')}</dl>`
+    : '';
+
+  return `<article class="card" data-option="${escapeHtml(meta.label)}" aria-labelledby="${cardId}-title">
   <div class="card-head">
-    <span class="name" title="${escapeHtml(relativePath)}">${escapeHtml(name)}</span>
-    <a class="open" href="${href}" target="_blank" rel="noopener">Open ↗</a>
+    <div class="card-title-group">
+      <span class="option-badge" aria-label="Option ${escapeHtml(meta.label)}">${escapeHtml(meta.label)}</span>
+      <div class="card-titles">
+        <h3 id="${cardId}-title" class="card-title">${escapeHtml(meta.title)}</h3>
+        <span class="name" title="${escapeHtml(meta.relativePath)}">${escapeHtml(meta.filename)}</span>
+      </div>
+      ${fidelityBadge}
+    </div>
+    <div class="card-actions">
+      <button type="button" class="interact-toggle" aria-pressed="false" title="Toggle pointer interaction inside preview">Interact</button>
+      <a class="open" href="${href}" target="_blank" rel="noopener" aria-label="Open Option ${escapeHtml(meta.label)} (${escapeHtml(meta.title)}) in new tab">Open ↗</a>
+    </div>
   </div>
-  <a class="frame" href="${href}" target="_blank" rel="noopener" aria-label="Open ${escapeHtml(relativePath)}">
-    <iframe src="${href}" title="${escapeHtml(relativePath)}" loading="lazy"></iframe>
-  </a>
+  ${thesisBlock || specsBlock ? `<div class="card-meta">${thesisBlock}${specsBlock}</div>` : ''}
+  <div class="frame-wrap">
+    <div class="frame">
+      <iframe src="${href}" title="Option ${escapeHtml(meta.label)} — ${escapeHtml(meta.title)} (${escapeHtml(meta.relativePath)})" loading="lazy"></iframe>
+    </div>
+  </div>
 </article>`;
-  }).join('\n');
+}
+
+function renderGroup(group, entries, rootJson) {
+  const title = group === '' ? 'Root' : group;
+  const groupDir = group === '' ? DESIGN_DIR : path.join(DESIGN_DIR, group);
+  const groupJson = readJsonFile(path.join(groupDir, 'options.json'));
+  const cards = entries
+    .map((relativePath, index) => {
+      const meta = resolveOptionMetadata(group, relativePath, index, groupJson, rootJson);
+      return renderCard(meta, index);
+    })
+    .join('\n');
   const count = entries.length === 1 ? '1 option' : `${entries.length} options`;
-  return `<section class="group">
+  return `<section class="group" aria-label="${escapeHtml(title)} options">
   <div class="group-head">
     <h2>${escapeHtml(title)}</h2>
     <span class="count">${count}</span>
@@ -196,16 +453,17 @@ function renderGallery() {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(relativePath);
   }
+  const rootJson = readJsonFile(path.join(DESIGN_DIR, 'options.json'));
   const orderedGroups = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
   const groupsHtml = orderedGroups.length > 0
-    ? orderedGroups.map(([group, entries]) => renderGroup(group, entries)).join('\n')
+    ? orderedGroups.map(([group, entries]) => renderGroup(group, entries, rootJson)).join('\n')
     : `<section class="empty">
   <h2>No HTML artifacts yet</h2>
   <p>Add files such as <code>home/option-a.html</code> or <code>button/option-a.html</code>.</p>
 </section>`;
-  const documents = ['REFERENCES.md', 'DECISIONS.md']
+  const documents = ['tokens.json', 'REFERENCES.md', 'DECISIONS.md', 'IMAGE-NOTES.md']
     .filter((name) => fs.existsSync(path.join(DESIGN_DIR, name)))
-    .map((name) => `<a class="doc" href="/${name}" target="_blank" rel="noopener">${name.replace(/\.md$/, '')}</a>`)
+    .map((name) => `<a class="doc" href="/${name}" target="_blank" rel="noopener">${escapeHtml(name.replace(/\.(md|json)$/, ''))}</a>`)
     .join('');
 
   return `<!DOCTYPE html>
@@ -218,27 +476,39 @@ function renderGallery() {
 :root {
   color-scheme: light dark;
   --bg: #faf9f7;
-  --fg: #1b1b1a;
-  --muted: #6b6a66;
-  --line: #e3e1dc;
+  --fg: #18181b;
+  --muted: #64645e;
+  --line: #e2e0d8;
   --surface: #ffffff;
+  --surface-subtle: #f4f3ef;
   --accent: #2457ff;
+  --accent-soft: #eef2ff;
+  --faithful-bg: #dcfce7;
+  --faithful-fg: #166534;
+  --exploration-bg: #fef3c7;
+  --exploration-fg: #92400e;
   --frame-w: 1440px;
   --frame-h: 900px;
-  --frame-scale: 0.25;
+  --frame-scale: 0.28;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #101010;
+    --bg: #0f0f10;
     --fg: #f2f1ee;
-    --muted: #9a998f;
-    --line: #2a2a28;
-    --surface: #171716;
+    --muted: #9c9b93;
+    --line: #282826;
+    --surface: #171718;
+    --surface-subtle: #1f1f21;
     --accent: #8ea8ff;
+    --accent-soft: #1e2640;
+    --faithful-bg: #132e1f;
+    --faithful-fg: #86efac;
+    --exploration-bg: #36240c;
+    --exploration-fg: #fcd34d;
   }
 }
-body[data-device="tablet"] { --frame-w: 768px; --frame-h: 1024px; --frame-scale: 0.47; }
-body[data-device="mobile"] { --frame-w: 390px; --frame-h: 844px; --frame-scale: 0.72; }
+body[data-device="tablet"] { --frame-w: 768px; --frame-h: 1024px; --frame-scale: 0.48; }
+body[data-device="mobile"] { --frame-w: 390px; --frame-h: 844px; --frame-scale: 0.78; }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
@@ -246,6 +516,19 @@ body {
   color: var(--fg);
   font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 100;
+  padding: 8px 14px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+}
+.skip-link:focus { left: 16px; }
 .bar {
   position: sticky;
   top: 0;
@@ -255,8 +538,8 @@ body {
   gap: 16px;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  padding: 12px 20px;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
 }
@@ -266,10 +549,10 @@ body {
   background: var(--accent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
 }
-.brand strong { display: block; font-size: 13px; letter-spacing: 0.01em; }
+.brand h1 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.01em; }
 .path {
   display: block;
-  max-width: 52vw;
+  max-width: 48vw;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -285,33 +568,234 @@ body {
   color: var(--muted);
   font: inherit;
   font-size: 12px;
+  font-weight: 500;
   padding: 6px 12px;
+  min-height: 28px;
   border-radius: 999px;
   cursor: pointer;
 }
 .devices button:hover { color: var(--fg); }
 .devices button.active { background: var(--accent); color: #fff; }
-.devices button:focus-visible, .doc:focus-visible, .open:focus-visible, .frame:focus-visible {
+.devices button:focus-visible,
+.doc:focus-visible,
+.open:focus-visible,
+.interact-toggle:focus-visible,
+.skip-link:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.doc { color: var(--muted); font-size: 12px; text-decoration: none; padding: 6px 8px; }
-.doc:hover { color: var(--fg); }
+.doc {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.doc:hover { color: var(--fg); border-color: var(--muted); }
 main { padding: 24px 20px 64px; }
-.group { margin: 0 0 40px; }
-.group-head { display: flex; gap: 12px; align-items: baseline; margin: 0 0 14px; }
-.group-head h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.01em; }
+.group { margin: 0 0 44px; }
+.group-head { display: flex; gap: 12px; align-items: baseline; margin: 0 0 16px; }
+.group-head h2 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -0.01em; }
 .count { color: var(--muted); font-size: 12px; }
-.row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: stretch;
+}
 .card {
+  display: flex;
+  flex-direction: column;
+  width: calc(var(--frame-w) * var(--frame-scale) + 2px);
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
-.card-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--line); }
-.name { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.open { color: var(--accent); font-size: 12px; text-decoration: none; white-space: nowrap; }
+.card-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-subtle);
+}
+.card-title-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+.option-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.card-titles {
+  min-width: 0;
+  flex: 1;
+}
+.card-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.name {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fidelity {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: capitalize;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+}
+.fidelity-faithful {
+  background: var(--faithful-bg);
+  color: var(--faithful-fg);
+}
+.fidelity-exploration {
+  background: var(--exploration-bg);
+  color: var(--exploration-fg);
+}
+.card-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.interact-toggle, .open {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 9px;
+  min-height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.interact-toggle:hover, .open:hover {
+  border-color: var(--accent);
+}
+.interact-toggle[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.open {
+  color: var(--accent);
+}
+.card-meta {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12px;
+}
+.thesis {
+  margin: 0;
+  color: var(--fg);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.card-specs {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.spec-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+.spec-row dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.spec-row dd {
+  margin: 0;
+  color: var(--fg);
+  font-size: 12px;
+  line-height: 1.4;
+  min-width: 0;
+}
+.spec-look {
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+.spec-look dd {
+  font-weight: 500;
+}
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.swatch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 6px 1px 4px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-subtle);
+}
+.swatch-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  flex-shrink: 0;
+}
+.swatch-chip code {
+  background: transparent;
+  padding: 0;
+  font-size: 11px;
+}
+.frame-wrap {
+  position: relative;
+  background: var(--surface-subtle);
+}
 .frame {
   display: block;
   position: relative;
@@ -330,37 +814,46 @@ main { padding: 24px 20px 64px; }
   pointer-events: none;
   background: #fff;
 }
+.card.is-interactive .frame iframe {
+  pointer-events: auto;
+}
 .empty { padding: 48px 0; color: var(--muted); }
 .empty h2 { margin: 0 0 8px; color: var(--fg); font-size: 16px; }
 code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--line); padding: 2px 5px; border-radius: 4px; }
 @media (max-width: 640px) {
   .path { max-width: 70vw; }
   .devices button { padding: 6px 9px; }
+  .spec-row { grid-template-columns: 1fr; gap: 2px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  * { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
 </style>
 </head>
 <body data-device="desktop">
+<a class="skip-link" href="#gallery-main">Skip to options</a>
 <header class="bar">
   <div class="brand">
     <span class="mark" aria-hidden="true"></span>
     <div>
-      <strong>show-me-the-design</strong>
+      <h1>show-me-the-design</h1>
       <span class="path" title="${escapeHtml(DESIGN_DIR)}">${escapeHtml(DESIGN_DIR)}</span>
     </div>
   </div>
   <div class="actions">
     ${documents}
-    <div class="devices" role="group" aria-label="Preview width">
-      <button type="button" data-device="desktop" aria-pressed="true">Desktop</button>
-      <button type="button" data-device="tablet" aria-pressed="false">Tablet</button>
-      <button type="button" data-device="mobile" aria-pressed="false">Mobile</button>
+    <div class="devices" role="group" aria-label="Preview viewport width">
+      <button type="button" data-device="desktop" data-viewport="1440" aria-pressed="true" title="Desktop viewport (1440px) — shortcut 1">Desktop 1440</button>
+      <button type="button" data-device="tablet" data-viewport="768" aria-pressed="false" title="Tablet viewport (768px) — shortcut 2">Tablet 768</button>
+      <button type="button" data-device="mobile" data-viewport="390" aria-pressed="false" title="Mobile viewport (390px) — shortcut 3">Mobile 390</button>
     </div>
   </div>
 </header>
-<main>
+<main id="gallery-main">
 ${groupsHtml}
 </main>
 <script>
@@ -371,6 +864,11 @@ ${groupsHtml}
   if (stored === 'desktop' || stored === 'tablet' || stored === 'mobile') {
     body.dataset.device = stored;
   }
+  function setDevice(device) {
+    body.dataset.device = device;
+    localStorage.setItem('smtd-device', device);
+    sync();
+  }
   function sync() {
     buttons.forEach(function (button) {
       var active = button.dataset.device === body.dataset.device;
@@ -380,10 +878,26 @@ ${groupsHtml}
   }
   buttons.forEach(function (button) {
     button.addEventListener('click', function () {
-      body.dataset.device = button.dataset.device;
-      localStorage.setItem('smtd-device', button.dataset.device);
-      sync();
+      setDevice(button.dataset.device);
     });
+  });
+  var toggles = Array.prototype.slice.call(document.querySelectorAll('.interact-toggle'));
+  toggles.forEach(function (toggle) {
+    toggle.addEventListener('click', function () {
+      var card = toggle.closest('.card');
+      if (!card) return;
+      var active = card.classList.toggle('is-interactive');
+      toggle.setAttribute('aria-pressed', active ? 'true' : 'false');
+      toggle.textContent = active ? 'Interactive' : 'Interact';
+    });
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+    var target = event.target;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
+    if (event.key === '1') setDevice('desktop');
+    else if (event.key === '2') setDevice('tablet');
+    else if (event.key === '3') setDevice('mobile');
   });
   sync();
   var source = new EventSource('/__reload');
@@ -621,6 +1135,7 @@ function shutdown(reason) {
   sseClients.clear();
   try {
     fs.rmSync(path.join(STATE_DIR, 'preview.json'), { force: true });
+    fs.rmSync(path.join(STATE_DIR, 'server.pid'), { force: true });
   } catch {
     // Ignore removal errors.
   }
@@ -632,9 +1147,24 @@ function shutdown(reason) {
 const server = http.createServer((request, response) => {
   lastActivity = Date.now();
 
+  const rawUrl = request.url ?? '/';
+  const rawPathname = rawUrl.split('?')[0].split('#')[0];
+  let rawDecodedPathname;
+  try {
+    rawDecodedPathname = decodeURIComponent(rawPathname);
+  } catch {
+    return sendText(response, 400, 'Bad request');
+  }
+  if (
+    rawPathname.split('/').some((segment) => segment === '..') ||
+    rawDecodedPathname.split(/[\\/]/).some((segment) => segment === '..')
+  ) {
+    return sendText(response, 403, 'Forbidden');
+  }
+
   let parsedUrl;
   try {
-    parsedUrl = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
+    parsedUrl = new URL(rawUrl, `http://${request.headers.host ?? 'localhost'}`);
   } catch {
     return sendText(response, 400, 'Bad request');
   }
