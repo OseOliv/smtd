@@ -176,10 +176,24 @@ function renderGroup(group, entries) {
 </article>`;
   }).join('\n');
   const count = entries.length === 1 ? '1 option' : `${entries.length} options`;
+
+  const groupDirectory = group === '' ? DESIGN_DIR : path.join(DESIGN_DIR, group);
+  const documents = [
+    ['DESIGN.md', 'Design language'],
+    ['system.html', 'System catalog']
+  ]
+    .filter(([name]) => fs.existsSync(path.join(groupDirectory, name)))
+    .map(([name, label]) => {
+      const relativePath = group === '' ? name : `${group}/${name}`;
+      return `<a class="doc" href="/${encodeRelPath(relativePath)}" target="_blank" rel="noopener">${label}</a>`;
+    })
+    .join('');
+
   return `<section class="group">
   <div class="group-head">
     <h2>${escapeHtml(title)}</h2>
     <span class="count">${count}</span>
+    <span class="group-docs">${documents}</span>
   </div>
   <div class="row">
 ${cards}
@@ -201,9 +215,9 @@ function renderGallery() {
     ? orderedGroups.map(([group, entries]) => renderGroup(group, entries)).join('\n')
     : `<section class="empty">
   <h2>No HTML artifacts yet</h2>
-  <p>Add files such as <code>home/option-a.html</code> or <code>button/option-a.html</code>.</p>
+  <p>Add files such as <code>home/option-a/index.html</code> or <code>button/option-a/index.html</code>.</p>
 </section>`;
-  const documents = ['REFERENCES.md', 'DECISIONS.md']
+  const documents = ['REFERENCES.md', 'DECISIONS.md', 'IMAGE-NOTES.md']
     .filter((name) => fs.existsSync(path.join(DESIGN_DIR, name)))
     .map((name) => `<a class="doc" href="/${name}" target="_blank" rel="noopener">${name.replace(/\.md$/, '')}</a>`)
     .join('');
@@ -302,6 +316,8 @@ main { padding: 24px 20px 64px; }
 .group-head { display: flex; gap: 12px; align-items: baseline; margin: 0 0 14px; }
 .group-head h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.01em; }
 .count { color: var(--muted); font-size: 12px; }
+.group-docs { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+.group-docs .doc { border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
 .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
 .card {
   border: 1px solid var(--line);

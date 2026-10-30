@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design system catalog</title>
+<link rel="stylesheet" href="tokens.css">
+<style data-catalog-chrome>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--color-canvas-soft);
+    color: var(--color-ink);
+    font-family: var(--type-body-md-family);
+    font-size: var(--type-body-md-size);
+    line-height: var(--type-body-md-leading);
+  }
+  .page {
+    width: min(100% - 2 * var(--space-lg), 1120px);
+    margin: 0 auto;
+    padding: var(--space-4xl) 0 var(--space-6xl);
+  }
+  .page-head { margin-bottom: var(--space-3xl); }
+  .eyebrow {
+    margin: 0 0 var(--space-xs);
+    color: var(--color-mute);
+    font-family: var(--type-caption-mono-family);
+    font-size: var(--type-caption-mono-size);
+    line-height: var(--type-caption-mono-leading);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  h1 {
+    margin: 0 0 var(--space-sm);
+    font-family: var(--type-display-lg-family);
+    font-size: var(--type-display-lg-size);
+    font-weight: var(--type-display-lg-weight);
+    line-height: var(--type-display-lg-leading);
+    letter-spacing: var(--type-display-lg-tracking);
+  }
+  h2 {
+    margin: 0 0 var(--space-md);
+    font-family: var(--type-display-sm-family);
+    font-size: var(--type-display-sm-size);
+    font-weight: var(--type-display-sm-weight);
+    line-height: var(--type-display-sm-leading);
+    letter-spacing: var(--type-display-sm-tracking);
+  }
+  .lede { max-width: 62ch; margin: 0; color: var(--color-body); }
+  .specimen {
+    margin: 0 0 var(--space-3xl);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--color-hairline);
+  }
+  .specimen > p { max-width: 62ch; color: var(--color-body); }
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: var(--space-sm);
+  }
+  .swatch {
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-canvas);
+  }
+  .swatch-chip { height: 64px; border-bottom: 1px solid var(--color-hairline); }
+  .swatch-meta { padding: var(--space-xs) var(--space-sm); }
+  .swatch-name { display: block; font-family: var(--type-caption-mono-family); font-size: var(--type-caption-mono-size); }
+  .swatch-value { display: block; color: var(--color-mute); font-family: var(--type-caption-mono-family); font-size: var(--type-caption-mono-size); }
+  .ramp-row { display: grid; gap: var(--space-xxs); padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-hairline); }
+  .ramp-row:last-child { border-bottom: 0; }
+  .ramp-label { color: var(--color-mute); font-family: var(--type-caption-mono-family); font-size: var(--type-caption-mono-size); }
+  .radius-grid, .elevation-grid, .space-grid, .component-grid {
+    display: grid;
+    gap: var(--space-md);
+  }
+  .radius-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .radius-cell { display: grid; gap: var(--space-xs); justify-items: start; }
+  .radius-box {
+    width: 100%;
+    height: 64px;
+    background: var(--color-canvas);
+    border: 1px solid var(--color-hairline);
+  }
+  .elevation-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+  .elevation-card {
+    display: grid;
+    gap: var(--space-xxs);
+    padding: var(--space-md);
+    background: var(--color-canvas);
+    border-radius: var(--radius-lg);
+  }
+  .space-grid { grid-template-columns: 1fr; }
+  .space-row { display: flex; gap: var(--space-sm); align-items: center; }
+  .space-bar { height: 12px; background: var(--color-primary); border-radius: var(--radius-xs); }
+  .space-name { min-width: 96px; color: var(--color-mute); font-family: var(--type-caption-mono-family); font-size: var(--type-caption-mono-size); }
+  .component-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .panel {
+    display: grid;
+    gap: var(--space-sm);
+    align-content: start;
+    padding: var(--space-lg);
+    background: var(--color-canvas);
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-lg);
+  }
+  .button {
+    display: inline-flex;
+    gap: var(--space-xs);
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: var(--space-xs) var(--space-lg);
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    font-family: var(--type-button-lg-family);
+    font-size: var(--type-button-lg-size);
+    font-weight: var(--type-button-lg-weight);
+    line-height: var(--type-button-lg-leading);
+    cursor: pointer;
+  }
+  .button-primary { background: var(--color-primary); color: var(--color-on-primary); }
+  .button-secondary {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    border-color: var(--color-hairline-strong);
+  }
+  .button:focus-visible,
+  .field:focus-visible {
+    outline: 2px solid var(--color-link);
+    outline-offset: 2px;
+  }
+  .button[disabled] { opacity: 0.55; cursor: not-allowed; }
+  .field {
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-xs) var(--space-sm);
+    border: 1px solid var(--color-hairline-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--type-body-md-family);
+    font-size: var(--type-body-md-size);
+  }
+  .field-label { font-family: var(--type-body-sm-family); font-size: var(--type-body-sm-size); font-weight: 600; }
+  .field-hint { color: var(--color-mute); font-family: var(--type-caption-family); font-size: var(--type-caption-size); }
+  .field-error { color: var(--color-error); font-family: var(--type-caption-family); font-size: var(--type-caption-size); }
+  .note { color: var(--color-mute); font-family: var(--type-caption-family); font-size: var(--type-caption-size); }
+  .surface-grid { display: grid; gap: var(--space-md); grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .surface-frame {
+    display: grid;
+    gap: var(--space-xxs);
+    min-height: 120px;
+    align-content: start;
+    padding: var(--space-md);
+    background: var(--color-canvas-soft-2);
+    border: 1px dashed var(--color-hairline-strong);
+    border-radius: var(--radius-md);
+  }
+  .surface-frame strong { font-family: var(--type-body-sm-strong-family); font-size: var(--type-body-sm-strong-size); }
+  .todo {
+    padding: var(--space-sm);
+    border: 1px dashed var(--color-warning);
+    border-radius: var(--radius-sm);
+    background: var(--color-warning-soft);
+    color: var(--color-ink);
+    font-family: var(--type-caption-family);
+    font-size: var(--type-caption-size);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <p class="eyebrow">Design system catalog</p>
+    <h1>Option A — design language</h1>
+    <p class="lede">Every value below comes from <code>tokens.css</code>, which mirrors
+      the frontmatter of <code>DESIGN.md</code>. If a swatch or a ramp row looks wrong,
+      fix the token, not this page.</p>
+  </header>
+
+  <section class="specimen" data-specimen="swatches" aria-labelledby="swatches-title">
+    <h2 id="swatches-title">Color roles</h2>
+    <p>Semantic roles, not decoration. Each chip is painted with its token.</p>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch-chip" style="background: var(--color-canvas)"></div><div class="swatch-meta"><span class="swatch-name">canvas</span><span class="swatch-value">--color-canvas</span></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: var(--color-canvas-soft)"></div><div class="swatch-meta"><span class="swatch-name">canvas-soft</span><span class="swatch-value">--color-canvas-soft</span></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: var(--color-ink)"></div><div class="swatch-meta"><span class="swatch-name">ink</span><span class="swatch-value">--color-ink</span></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: var(--color-body)"></div><div class="swatch-meta"><span class="swatch-name">body</span><span class="swatch-value">--color-body</span></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: var(--color-mute)"></div><div class="swatch-meta"><span class="swatch-name">mute</span><span class="swatch-value">--color-mute</span></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: var(--color-primary)"></div><div class="swatch-meta"><span class="swatch-name">primary</span><span class="swatch-value">--color-primary</span></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: var(--color-link)"></div><div class="swatch-meta"><span class="swatch-name">link</span><span class="swatch-value">--color-link</span></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: var(--color-success)"></div><div class="swatch-meta"><span class="swatch-name">success</span><span class="swatch-value">--color-success</span></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: var(--color-error)"></div><div class="swatch-meta"><span class="swatch-name">error</span><span class="swatch-value">--color-error</span></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: var(--color-warning)"></div><div class="swatch-meta"><span class="swatch-name">warning</span><span class="swatch-value">--color-warning</span></div></div>
+    </div>
+  </section>
+
+  <section class="specimen" data-specimen="type-ramp" aria-labelledby="type-title">
+    <h2 id="type-title">Type ramp</h2>
+    <p>Rendered at the token size, weight, leading, and tracking.</p>
+    <div class="ramp">
+      <div class="ramp-row"><span class="ramp-label">display-xl</span><span style="font-family: var(--type-display-xl-family); font-size: var(--type-display-xl-size); font-weight: var(--type-display-xl-weight); line-height: var(--type-display-xl-leading); letter-spacing: var(--type-display-xl-tracking)">Build something worth looking at.</span></div>
+      <div class="ramp-row"><span class="ramp-label">display-lg</span><span style="font-family: var(--type-display-lg-family); font-size: var(--type-display-lg-size); font-weight: var(--type-display-lg-weight); line-height: var(--type-display-lg-leading); letter-spacing: var(--type-display-lg-tracking)">Build something worth looking at.</span></div>
+      <div class="ramp-row"><span class="ramp-label">display-md</span><span style="font-family: var(--type-display-md-family); font-size: var(--type-display-md-size); font-weight: var(--type-display-md-weight); line-height: var(--type-display-md-leading); letter-spacing: var(--type-display-md-tracking)">Build something worth looking at.</span></div>
+      <div class="ramp-row"><span class="ramp-label">display-sm</span><span style="font-family: var(--type-display-sm-family); font-size: var(--type-display-sm-size); font-weight: var(--type-display-sm-weight); line-height: var(--type-display-sm-leading); letter-spacing: var(--type-display-sm-tracking)">Build something worth looking at.</span></div>
+      <div class="ramp-row"><span class="ramp-label">body-lg</span><span style="font-family: var(--type-body-lg-family); font-size: var(--type-body-lg-size); font-weight: var(--type-body-lg-weight); line-height: var(--type-body-lg-leading)">Body copy states the job of the surface plainly.</span></div>
+      <div class="ramp-row"><span class="ramp-label">body-md</span><span style="font-family: var(--type-body-md-family); font-size: var(--type-body-md-size); font-weight: var(--type-body-md-weight); line-height: var(--type-body-md-leading)">Body copy states the job of the surface plainly.</span></div>
+      <div class="ramp-row"><span class="ramp-label">body-sm</span><span style="font-family: var(--type-body-sm-family); font-size: var(--type-body-sm-size); font-weight: var(--type-body-sm-weight); line-height: var(--type-body-sm-leading)">Secondary copy and metadata.</span></div>
+      <div class="ramp-row"><span class="ramp-label">caption</span><span style="font-family: var(--type-caption-family); font-size: var(--type-caption-size); font-weight: var(--type-caption-weight); line-height: var(--type-caption-leading)">CAPTION / METADATA</span></div>
+      <div class="ramp-row"><span class="ramp-label">caption-mono</span><span style="font-family: var(--type-caption-mono-family); font-size: var(--type-caption-mono-size); font-weight: var(--type-caption-mono-weight); line-height: var(--type-caption-mono-leading)">TECHNICAL LABEL</span></div>
+      <div class="ramp-row"><span class="ramp-label">code</span><span style="font-family: var(--type-code-family); font-size: var(--type-code-size); font-weight: var(--type-code-weight); line-height: var(--type-code-leading)">npm run build</span></div>
+    </div>
+  </section>
+
+  <section class="specimen" data-specimen="radius" aria-labelledby="radius-title">
+    <h2 id="radius-title">Radius scale</h2>
+    <p>One scale per surface class. Pill is reserved for actions, not containers.</p>
+    <div class="radius-grid">
+      <div class="radius-cell"><div class="radius-box" style="border-radius: var(--radius-none)"></div><span class="ramp-label">none</span></div>
+      <div class="radius-cell"><div class="radius-box" style="border-radius: var(--radius-sm)"></div><span class="ramp-label">sm</span></div>
+      <div class="radius-cell"><div class="radius-box" style="border-radius: var(--radius-md)"></div><span class="ramp-label">md</span></div>
+      <div class="radius-cell"><div class="radius-box" style="border-radius: var(--radius-lg)"></div><span class="ramp-label">lg</span></div>
+      <div class="radius-cell"><div class="radius-box" style="border-radius: var(--radius-pill)"></div><span class="ramp-label">pill</span></div>
+    </div>
+  </section>
+
+  <section class="specimen" data-specimen="spacing" aria-labelledby="spacing-title">
+    <h2 id="spacing-title">Spacing scale</h2>
+    <p>Bars are drawn at the token width. Section padding uses the largest steps only.</p>
+    <div class="space-grid">
+      <div class="space-row"><span class="space-name">xxs</span><span class="space-bar" style="width: var(--spacing.xxs)"></span></div>
+      <div class="space-row"><span class="space-name">xs</span><span class="space-bar" style="width: var(--spacing.xs)"></span></div>
+      <div class="space-row"><span class="space-name">sm</span><span class="space-bar" style="width: var(--spacing.sm)"></span></div>
+      <div class="space-row"><span class="space-name">md</span><span class="space-bar" style="width: var(--spacing.md)"></span></div>
+      <div class="space-row"><span class="space-name">lg</span><span class="space-bar" style="width: var(--spacing.lg)"></span></div>
+      <div class="space-row"><span class="space-name">xl</span><span class="space-bar" style="width: var(--spacing.xl)"></span></div>
+      <div class="space-row"><span class="space-name">3xl</span><span class="space-bar" style="width: var(--spacing.3xl)"></span></div>
+      <div class="space-row"><span class="space-name">4xl</span><span class="space-bar" style="width: var(--spacing.4xl)"></span></div>
+    </div>
+  </section>
+
+  <section class="specimen" data-specimen="elevation" aria-labelledby="elevation-title">
+    <h2 id="elevation-title">Elevation ladder</h2>
+    <p>Each level renders the real shadow token against the canvas.</p>
+    <div class="elevation-grid">
+      <div class="elevation-card" style="box-shadow: var(--shadow-hairline)"><strong>Level 1</strong><span class="note">hairline</span></div>
+      <div class="elevation-card" style="box-shadow: var(--shadow-sm)"><strong>Level 2</strong><span class="note">raised</span></div>
+      <div class="elevation-card" style="box-shadow: var(--shadow-md)"><strong>Level 3</strong><span class="note">floating</span></div>
+      <div class="elevation-card" style="box-shadow: var(--shadow-lg)"><strong>Level 4</strong><span class="note">overlay</span></div>
+      <div class="elevation-card" style="box-shadow: var(--shadow-modal)"><strong>Level 5</strong><span class="note">modal</span></div>
+    </div>
+  </section>
+
+  <section class="specimen" data-specimen="components" aria-labelledby="components-title">
+    <h2 id="components-title">Components and states</h2>
+    <p>Default, focus, disabled. Hover is verified in the browser, not in a static catalog.</p>
+    <div class="component-grid">
+      <div class="panel">
+        <button class="button button-primary" type="button">Primary action</button>
+        <button class="button button-secondary" type="button">Secondary action</button>
+        <button class="button button-primary" type="button" disabled>Disabled</button>
+        <span class="note">Targets render at 44px minimum.</span>
+      </div>
+      <div class="panel">
+        <label class="field-label" for="catalog-field">Email</label>
+        <input class="field" id="catalog-field" type="email" placeholder="you@example.com" aria-describedby="catalog-hint">
+        <span class="field-hint" id="catalog-hint">We only use this to sign you in.</span>
+        <span class="field-error" role="alert">Enter a valid email address.</span>
+      </div>
+      <div class="panel">
+        <strong>Card</strong>
+        <p class="note">Card chrome uses the card elevation level and the card radius step.</p>
+        <a class="button button-secondary" href="#components-title">Card action</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="specimen" data-specimen="surfaces" aria-labelledby="surfaces-title">
+    <h2 id="surfaces-title">Application surfaces</h2>
+    <p>Prove the language on real product surfaces, not only on marketing blocks.</p>
+    <div class="surface-grid">
+      <div class="surface-frame"><strong>App shell</strong><span class="note">Sidebar, top bar, content region.</span></div>
+      <div class="surface-frame"><strong>Data table</strong><span class="note">Header, rows, empty, loading, error.</span></div>
+      <div class="surface-frame"><strong>Auth form</strong><span class="note">Sign in, sign up, recovery, validation.</span></div>
+      <div class="surface-frame"><strong>Modal</strong><span class="note">Focus trap, Esc, return focus.</span></div>
+      <div class="surface-frame"><strong>Toast</strong><span class="note">Success, error, dismiss, live region.</span></div>
+      <div class="surface-frame"><strong>Empty state</strong><span class="note">Explanation, primary action, recovery.</span></div>
+    </div>
+    <p class="todo">TODO: replace each frame with a real specimen, or record in Known Gaps why a
+      surface does not apply to this artifact.</p>
+  </section>
+</main>
+</body>
+</html>
