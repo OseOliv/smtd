@@ -10,6 +10,10 @@ judge at a local URL — not a description of a design. A design is not done unt
 language is written down, its tokens are the only visual values in the code, and its
 catalog proves the system on real surfaces.
 
+**Paths.** `scripts/…` and `templates/…` in this skill are relative to the directory
+that contains this `SKILL.md` (the skill root), never to the project. Set `SKILL_DIR`
+to that absolute directory before running a command.
+
 ## Operating rules
 
 - **Option gate.** For every new visual request, produce 2–3 genuinely distinct
@@ -417,7 +421,8 @@ language works beyond the hero.
 ### 7.4 Validate before serving
 
 ```bash
-scripts/check-design.mjs --design-dir /abs/path --pretty
+SKILL_DIR="<absolute path to this skill's directory>"
+"$SKILL_DIR/scripts/check-design.mjs" --design-dir /abs/path --pretty
 ```
 
 It fails on: broken token references, token drift between `DESIGN.md` and
@@ -429,7 +434,8 @@ drift before showing the workspace.
 ## 8. Serve it
 
 ```bash
-scripts/start-preview.sh --design-dir /abs/path
+SKILL_DIR="<absolute path to this skill's directory>"
+"$SKILL_DIR/scripts/start-preview.sh" --design-dir /abs/path
 ```
 
 Prints JSON:
@@ -478,7 +484,7 @@ Server contract:
 
 ## 10. Handoff
 
-- Stop the server: `scripts/stop-preview.sh <design-dir>`, unless the user is still
+- Stop the server: `"$SKILL_DIR/scripts/stop-preview.sh" <design-dir>`, unless the user is still
   comparing options.
 - Summarize artifacts, options, states, references, design tokens, and files.
 - Confirm the chosen option and record it in `DECISIONS.md`.
